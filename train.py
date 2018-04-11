@@ -1,5 +1,5 @@
 #! /usr/bin/env python
-
+# -*- coding:utf-8 -*-
 import tensorflow as tf
 import numpy as np
 import re
@@ -15,31 +15,55 @@ import gzip
 from random import random
 # Parameters
 # ==================================================
+#
+# tf.flags.DEFINE_boolean("is_char_based", True, "is character based syntactic similarity. "
+#                                                "if false then word embedding based semantic similarity is used."
+#                                                "(default: True)")
+#
+# tf.flags.DEFINE_string("word2vec_model", "wiki.simple.vec", "word2vec pre-trained embeddings file (default: None)")
+# tf.flags.DEFINE_string("word2vec_format", "text", "word2vec pre-trained embeddings file format (bin/text/textgz)(default: None)")
+#
+# tf.flags.DEFINE_integer("embedding_dim", 300, "Dimensionality of character embedding (default: 300)")
+# tf.flags.DEFINE_float("dropout_keep_prob", 1.0, "Dropout keep probability (default: 1.0)")
+# tf.flags.DEFINE_float("l2_reg_lambda", 0.0, "L2 regularizaion lambda (default: 0.0)")
+# tf.flags.DEFINE_string("training_files", "person_match.train2", "training file (default: None)")  #for sentence semantic similarity use "train_snli.txt"
+# #tf.flags.DEFINE_string("training_files", "train_snli.txt", "training file (default: None)")  #for sentence semantic similarity use "train_snli.txt"
+#
+# tf.flags.DEFINE_integer("hidden_units", 50, "Number of hidden units (default:50)")
+# Training parameters
+# tf.flags.DEFINE_integer("batch_size", 64, "Batch Size (default: 64)")
+# tf.flags.DEFINE_integer("num_epochs", 200, "Number of training epochs (default: 200)")
+# tf.flags.DEFINE_integer("evaluate_every", 1000, "Evaluate model on dev set after this many steps (default: 100)")
+# tf.flags.DEFINE_integer("checkpoint_every", 1000, "Save model after this many steps (default: 100)")
+#
 
-tf.flags.DEFINE_boolean("is_char_based", True, "is character based syntactic similarity. "
+## the sentence parms for the similarity of the sentences
+
+tf.flags.DEFINE_boolean("is_char_based", False, "is character based syntactic similarity. "
                                                "if false then word embedding based semantic similarity is used."
                                                "(default: True)")
 
-tf.flags.DEFINE_string("word2vec_model", "wiki.simple.vec", "word2vec pre-trained embeddings file (default: None)")
+tf.flags.DEFINE_string("word2vec_model", "glove.6B.100d.txt", "word2vec pre-trained embeddings file (default: None)")
 tf.flags.DEFINE_string("word2vec_format", "text", "word2vec pre-trained embeddings file format (bin/text/textgz)(default: None)")
 
-tf.flags.DEFINE_integer("embedding_dim", 300, "Dimensionality of character embedding (default: 300)")
+tf.flags.DEFINE_integer("embedding_dim", 100, "Dimensionality of character embedding (default: 300)")
 tf.flags.DEFINE_float("dropout_keep_prob", 1.0, "Dropout keep probability (default: 1.0)")
 tf.flags.DEFINE_float("l2_reg_lambda", 0.0, "L2 regularizaion lambda (default: 0.0)")
-tf.flags.DEFINE_string("training_files", "person_match.train2", "training file (default: None)")  #for sentence semantic similarity use "train_snli.txt"
+tf.flags.DEFINE_string("training_files", "person_match.train3", "training file (default: None)")  #for sentence semantic similarity use "train_snli.txt"
+#tf.flags.DEFINE_string("training_files", "train_snli.txt", "training file (default: None)")  #for sentence semantic similarity use "train_snli.txt"
 tf.flags.DEFINE_integer("hidden_units", 50, "Number of hidden units (default:50)")
 
 # Training parameters
 tf.flags.DEFINE_integer("batch_size", 64, "Batch Size (default: 64)")
 tf.flags.DEFINE_integer("num_epochs", 300, "Number of training epochs (default: 200)")
-tf.flags.DEFINE_integer("evaluate_every", 1000, "Evaluate model on dev set after this many steps (default: 100)")
-tf.flags.DEFINE_integer("checkpoint_every", 1000, "Save model after this many steps (default: 100)")
+tf.flags.DEFINE_integer("evaluate_every", 100, "Evaluate model on dev set after this many steps (default: 100)")
+tf.flags.DEFINE_integer("checkpoint_every", 100, "Save model after this many steps (default: 100)")
 # Misc Parameters
 tf.flags.DEFINE_boolean("allow_soft_placement", True, "Allow device soft device placement")
 tf.flags.DEFINE_boolean("log_device_placement", False, "Log placement of ops on devices")
 
 FLAGS = tf.flags.FLAGS
-FLAGS._parse_flags()
+#FLAGS._parse_flags()
 print("\nParameters:")
 for attr, value in sorted(FLAGS.__flags.items()):
     print("{}={}".format(attr.upper(), value))
@@ -48,6 +72,8 @@ print("")
 if FLAGS.training_files==None:
     print("Input Files List is empty. use --training_files argument.")
     exit()
+
+
 
 
 max_document_length=15
@@ -69,7 +95,7 @@ else:
         inpH.loadW2V(FLAGS.word2vec_model, FLAGS.word2vec_format)
 
 # Training
-# ==================================================
+# =================================================
 print("starting graph def")
 with tf.Graph().as_default():
     session_conf = tf.ConfigProto(
@@ -97,8 +123,11 @@ with tf.Graph().as_default():
                 batch_size=FLAGS.batch_size,
                 trainableEmbeddings=trainableEmbeddings
             )
+            print("use the LSTM W2V..................................... model ")
         # Define Training procedure
         global_step = tf.Variable(0, name="global_step", trainable=False)
+        # AdamOptimizer 优化器，参数可以被修改，这里是使用的是默认的 Adam优化算法，
+        # 寻找一个全局最优算法，引入二次方梯度校正，相比于基础SGD算法，1.不容易陷于局部优点。2.速度更快
         optimizer = tf.train.AdamOptimizer(1e-3)
         print("initialized siameseModel object")
     
@@ -135,10 +164,15 @@ with tf.Graph().as_default():
     dev_summary_writer = tf.summary.FileWriter(dev_summary_dir, sess.graph)
 
     # Checkpoint directory. Tensorflow assumes this directory already exists so we need to create it
+    print ("Checkpoint directory. Tensorflow assumes this directory already exists so we need to create it")
     checkpoint_dir = os.path.abspath(os.path.join(out_dir, "checkpoints"))
     checkpoint_prefix = os.path.join(checkpoint_dir, "model")
+    print ("the model abs path is " + " " + checkpoint_prefix)
     if not os.path.exists(checkpoint_dir):
         os.makedirs(checkpoint_dir)
+    # if not os.path.exists(checkpoint_prefix):
+    #     os.makedirs(checkpoint_prefix)
+
     saver = tf.train.Saver(tf.global_variables(), max_to_keep=100)
 
     # Write vocabulary
@@ -147,7 +181,7 @@ with tf.Graph().as_default():
     # Initialize all variables
     sess.run(tf.global_variables_initializer())
     
-    print("init all variables")
+    print("init all variables........................................................")
     graph_def = tf.get_default_graph().as_graph_def()
     graphpb_txt = str(graph_def)
     with open(os.path.join(checkpoint_dir, "graphpb.txt"), 'w') as f:
@@ -176,7 +210,10 @@ with tf.Graph().as_default():
         print("Done assigning intiW. len="+str(len(initW)))
         inpH.deletePreEmb()
         gc.collect()
+        print ("start to run the session run ")
         sess.run(siameseModel.W.assign(initW))
+        print ("The session run finished ..................")
+
 
     def train_step(x1_batch, x2_batch, y_batch):
         """
@@ -198,6 +235,21 @@ with tf.Graph().as_default():
             }
         _, step, loss, accuracy, dist, sim, summaries = sess.run([tr_op_set, global_step, siameseModel.loss, siameseModel.accuracy, siameseModel.distance, siameseModel.temp_sim, train_summary_op],  feed_dict)
         time_str = datetime.datetime.now().isoformat()
+
+        # 这一段被作者删除了
+        # time_str = datetime.datetime.now().isoformat()
+        # # 获取最后的输出值 >= 0.5为0，小于0.5为1
+        #
+        # d = np.copy(dist)
+        #
+        # d[d >= 0.5] = 999.0
+        #
+        # d[d < 0.5] = 1
+        #
+        # d[d > 1.0] = 0
+        #
+        # accuracy = np.mean(y_batch == d)
+
         print("TRAIN {}: step {}, loss {:g}, acc {:g}".format(time_str, step, loss, accuracy))
         train_summary_writer.add_summary(summaries, step)
         print(y_batch, dist, sim)
@@ -224,7 +276,7 @@ with tf.Graph().as_default():
         time_str = datetime.datetime.now().isoformat()
         print("DEV {}: step {}, loss {:g}, acc {:g}".format(time_str, step, loss, accuracy))
         dev_summary_writer.add_summary(summaries, step)
-        print (y_batch, sim)
+        # print (y_batch, sim)
         return accuracy
 
     # Generate batches
@@ -234,6 +286,7 @@ with tf.Graph().as_default():
     ptr=0
     max_validation_acc=0.0
     for nn in xrange(sum_no_of_batches*FLAGS.num_epochs):
+        print("nn =  {}".format(nn))
         batch = batches.next()
         if len(batch)<1:
             continue
@@ -242,6 +295,7 @@ with tf.Graph().as_default():
             continue
         train_step(x1_batch, x2_batch, y_batch)
         current_step = tf.train.global_step(sess, global_step)
+        print("surrent step {}".format(current_step))
         sum_acc=0.0
         if current_step % FLAGS.evaluate_every == 0:
             print("\nEvaluation:")
@@ -253,7 +307,10 @@ with tf.Graph().as_default():
                 if len(y_dev_b)<1:
                     continue
                 acc = dev_step(x1_dev_b, x2_dev_b, y_dev_b)
+                # print("acc = {}---------------------------------------------" .format(acc))
                 sum_acc = sum_acc + acc
+                print("sumacc = {}---------------------------------------------".format(sum_acc))
+
             print("")
         if current_step % FLAGS.checkpoint_every == 0:
             if sum_acc >= max_validation_acc:
@@ -261,3 +318,8 @@ with tf.Graph().as_default():
                 saver.save(sess, checkpoint_prefix, global_step=current_step)
                 tf.train.write_graph(sess.graph.as_graph_def(), checkpoint_prefix, "graph"+str(nn)+".pb", as_text=False)
                 print("Saved model {} with sum_accuracy={} checkpoint to {}\n".format(nn, max_validation_acc, checkpoint_prefix))
+            else:
+                print("sum_acc= {},max_validation_acc={}\n".format(sum_acc, max_validation_acc))
+
+
+
