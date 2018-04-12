@@ -38,6 +38,9 @@ from random import random
 #
 
 ## the sentence parms for the similarity of the sentences
+## the sentence parms for the similarity of the sentences
+## the sentence parms for the similarity of the sentences
+## the sentence parms for the similarity of the sentences
 
 tf.flags.DEFINE_boolean("is_char_based", False, "is character based syntactic similarity. "
                                                "if false then word embedding based semantic similarity is used."
