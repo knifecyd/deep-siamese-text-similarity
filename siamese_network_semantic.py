@@ -1,3 +1,4 @@
+# -*- coding:utf-8 -*-
 import tensorflow as tf
 import numpy as np
 
@@ -22,8 +23,9 @@ class SiameseLSTMw2v(object):
                 fw_cell = tf.nn.rnn_cell.BasicLSTMCell(n_hidden, forget_bias=1.0, state_is_tuple=True)
                 lstm_fw_cell = tf.contrib.rnn.DropoutWrapper(fw_cell,output_keep_prob=dropout)
                 stacked_rnn_fw.append(lstm_fw_cell)
+            #我们使用了2层的LSTM网络。也就是说，前一层的LSTM的输出作为后一层的输入。使用tf.nn.rnn_cell.MultiRNNCell可以实现这个功能。这
+            #这里表示多层的LSTM网路，使用这个方法
             lstm_fw_cell_m = tf.nn.rnn_cell.MultiRNNCell(cells=stacked_rnn_fw, state_is_tuple=True)
-
             outputs, _ = tf.nn.static_rnn(lstm_fw_cell_m, x, dtype=tf.float32)
         return outputs[-1]
 
@@ -37,9 +39,11 @@ class SiameseLSTMw2v(object):
         self, sequence_length, vocab_size, embedding_size, hidden_units, l2_reg_lambda, batch_size, trainableEmbeddings):
 
         # Placeholders for input, output and dropout
+        # 此函数可以理解为形参，用于定义过程，在执行的时候再赋具体的值
         self.input_x1 = tf.placeholder(tf.int32, [None, sequence_length], name="input_x1")
         self.input_x2 = tf.placeholder(tf.int32, [None, sequence_length], name="input_x2")
         self.input_y = tf.placeholder(tf.float32, [None], name="input_y")
+        # drop out 参数，用来解决过拟合的情况
         self.dropout_keep_prob = tf.placeholder(tf.float32, name="dropout_keep_prob")
 
         # Keeping track of l2 regularization loss (optional)
@@ -55,8 +59,10 @@ class SiameseLSTMw2v(object):
         print self.embedded_words1
         # Create a convolution + maxpool layer for each filter size
         with tf.name_scope("output"):
+            # 构造两个独立的神经网络
             self.out1=self.stackedRNN(self.embedded_words1, self.dropout_keep_prob, "side1", embedding_size, sequence_length, hidden_units)
             self.out2=self.stackedRNN(self.embedded_words2, self.dropout_keep_prob, "side2", embedding_size, sequence_length, hidden_units)
+            # 定义距离
             self.distance = tf.sqrt(tf.reduce_sum(tf.square(tf.subtract(self.out1,self.out2)),1,keep_dims=True))
             self.distance = tf.div(self.distance, tf.add(tf.sqrt(tf.reduce_sum(tf.square(self.out1),1,keep_dims=True)),tf.sqrt(tf.reduce_sum(tf.square(self.out2),1,keep_dims=True))))
             self.distance = tf.reshape(self.distance, [-1], name="distance")

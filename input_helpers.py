@@ -1,3 +1,4 @@
+# -*- coding:utf-8 -*-
 import numpy as np
 import re
 import itertools
@@ -76,7 +77,8 @@ class InputHelper(object):
             else:
                 x1.append(l[1].lower())
                 x2.append(l[0].lower())
-            y.append(int(l[2]))
+            #y.append(int(l[2]))
+            y.append(1)
         return np.asarray(x1),np.asarray(x2),np.asarray(y)
 
     def getTsvDataCharBased(self, filepath):
@@ -172,6 +174,7 @@ class InputHelper(object):
         # Build vocabulary
         print("Building vocabulary")
         vocab_processor = MyVocabularyProcessor(max_document_length,min_frequency=0,is_char_based=is_char_based)
+        # 数组的合并后做,fit_transform()的作用就是先拟合数据，然后转化它将其转化为标准形式
         vocab_processor.fit_transform(np.concatenate((x2_text,x1_text),axis=0))
         print("Length of loaded vocabulary ={}".format( len(vocab_processor.vocabulary_)))
         i1=0
@@ -183,6 +186,8 @@ class InputHelper(object):
         # Randomly shuffle data
         np.random.seed(131)
         shuffle_indices = np.random.permutation(np.arange(len(y)))
+        #它会返回一个洗牌后的矩阵副本
+
         x1_shuffled = x1[shuffle_indices]
         x2_shuffled = x2[shuffle_indices]
         y_shuffled = y[shuffle_indices]
