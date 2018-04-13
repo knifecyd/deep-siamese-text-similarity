@@ -135,8 +135,18 @@ with tf.Graph().as_default():
         # 寻找一个全局最优算法，引入二次方梯度校正，相比于基础SGD算法，1.不容易陷于局部优点。2.速度更快
         optimizer = tf.train.AdamOptimizer(1e-3)
         print("initialized siameseModel object")
-    
+
+    # minimize()标准步骤，第一步和第二步
+    # 作用：对于在变量列表（var_list）中的变量计算对于损失函数的梯度, 这个函数返回一个（梯度，变量）对的列表，其中梯度就是相对应变量的梯度了。这是minimize()
+    # 函数的第一个部分，
     grads_and_vars=optimizer.compute_gradients(siameseModel.loss)
+    # 获得操作:
+    # 作用：把梯度“应用”（Apply）到变量上面去。其实就是按照梯度下降的方式加到上面去。这是minimize（）函数的第二个步骤。 返回一个应用的操作。
+    # 参数:
+    # grads_and_vars: compute_gradients()
+    # 函数返回的(gradient, variable)
+    # 对的列表
+    # global_step:
     tr_op_set = optimizer.apply_gradients(grads_and_vars, global_step=global_step)
     print("defined training_ops")
     # Keep track of gradient values and sparsity (optional)
@@ -155,6 +165,7 @@ with tf.Graph().as_default():
     print("Writing to {}\n".format(out_dir))
 
     # Summaries for loss and accuracy
+    # 看不懂，貌似是给tensorborad使用的
     loss_summary = tf.summary.scalar("loss", siameseModel.loss)
     acc_summary = tf.summary.scalar("accuracy", siameseModel.accuracy)
 
@@ -186,7 +197,6 @@ with tf.Graph().as_default():
     # Initialize all variables
     sess.run(tf.global_variables_initializer())
     
-    print("init all variables........................................................")
     graph_def = tf.get_default_graph().as_graph_def()
     graphpb_txt = str(graph_def)
     with open(os.path.join(checkpoint_dir, "graphpb.txt"), 'w') as f:
@@ -284,7 +294,7 @@ with tf.Graph().as_default():
         # print (y_batch, sim)
         return accuracy
 
-    # Generate batches
+    # Generate batches,batch 表示没次训练的循环的说有数据及准备内容
     batches=inpH.batch_iter(
                 list(zip(train_set[0], train_set[1], train_set[2])), FLAGS.batch_size, FLAGS.num_epochs)
 
@@ -292,12 +302,15 @@ with tf.Graph().as_default():
     max_validation_acc=0.0
     for nn in xrange(sum_no_of_batches*FLAGS.num_epochs):
         print("nn =  {}".format(nn))
+        #每次都取一个batch的数据。x1,x2,y
         batch = batches.next()
         if len(batch)<1:
             continue
         x1_batch,x2_batch, y_batch = zip(*batch)
         if len(y_batch)<1:
             continue
+
+        #每一步的训练，真正调用的步骤
         train_step(x1_batch, x2_batch, y_batch)
         current_step = tf.train.global_step(sess, global_step)
         print("surrent step {}".format(current_step))
@@ -311,6 +324,7 @@ with tf.Graph().as_default():
                 x1_dev_b,x2_dev_b,y_dev_b = zip(*db)
                 if len(y_dev_b)<1:
                     continue
+                ## 递归调用自己？
                 acc = dev_step(x1_dev_b, x2_dev_b, y_dev_b)
                 # print("acc = {}---------------------------------------------" .format(acc))
                 sum_acc = sum_acc + acc
